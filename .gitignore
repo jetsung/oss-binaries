@@ -13,3 +13,6 @@
 .actrc
 .artifacts
 event.json
+
+# build task
+repo/

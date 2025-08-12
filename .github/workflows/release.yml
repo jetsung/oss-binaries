@@ -94,13 +94,12 @@ jobs:
           TAG_NAME="${{ env.PROJECT_NAME }}-$(date +%Y%m%d)"
         fi
         git tag "$TAG_NAME"
-        git push origin "$TAG_NAME"
         echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
        # 发布 Release
     - name: 发布 Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.TAG_NAME }}
-        files: repo/dist/*
+        files: repo/dist/*.{tar.gz,zip}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
