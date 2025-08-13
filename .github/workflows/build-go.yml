@@ -1,0 +1,80 @@
+---
+name: Build Go Binary
+
+on  :
+  workflow_call:
+    inputs:
+      SOURCE:
+        description: 项目源码地址
+        required: true
+        type: string
+      VERSION:
+        description: 构建版本号（可选，默认最新）
+        required: false
+        type: string
+      BUILD_DIR:
+        description: 构建目录（可选，默认项目根目录）
+        required: false
+        type: string
+      EXTRA_ARGS:
+        description: 扩展参数（可选，默认无）
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: 环境变量写入 env
+      run: |
+        echo "SOURCE=${{ github.event.inputs.SOURCE }}" >> $GITHUB_ENV
+        echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
+        echo "BUILD_DIR=${{ github.event.inputs.BUILD_DIR }}" >> $GITHUB_ENV
+        PROJECT_NAME=$(basename "${{ github.event.inputs.SOURCE }}" .git)
+        echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
+    - name: 拉取源码
+      run: |
+        git clone "${{ env.SOURCE }}" repo
+        cd repo
+        if [ -n "${{ env.VERSION }}" ]; then
+          git checkout "${{ env.VERSION }}"
+        fi    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ^1.24
+        check-latest: true
+    - name: Set up GoReleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        install-only: true
+    - name: Build with GoReleaser
+      run: |
+        cd repo
+        cp ../.goreleaser.yaml .
+        if [ -n "${{ env.VERSION }}" ]; then
+          goreleaser release --clean --skip=validate,publish
+        else
+          goreleaser release --snapshot --clean --skip=validate,publish
+        fi
+    - name: Check files
+      run: |
+        ls -al repo/dist
+    - name: Create Tag
+      run: |
+        if [ -n "${{ env.VERSION }}" ]; then
+          TAG_NAME="${{ env.PROJECT_NAME }}-${{ env.VERSION }}"
+        else
+          TAG_NAME="${{ env.PROJECT_NAME }}-$(date +%Y%m%d)"
+        fi
+        git tag "$TAG_NAME"
+        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+    - name: Upload Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        files: repo/dist/*.{tar.gz,zip}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
