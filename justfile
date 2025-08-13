@@ -4,6 +4,8 @@ set shell := ["bash", "-cu"]
 
 goos := "linux windows darwin"
 goarch := "amd64 arm64 loong64"
+# goos := "linux"
+# goarch := "amd64"
 
 default:
     @echo "Shell is: $SHELL"
@@ -17,9 +19,12 @@ list-files:
 build-go:
     @echo "Building Go project..."
     @cd repo && \
-        _main_file=$(find . \
+        files=($(find . \
             -type d \( -path "./vendor" -o -path "./tests" \) -prune -false -o \
-            -type f -name "*.go" -exec grep -l "^func main() {" {} +) && \
+            -type f -name "*.go" -exec grep -l "^func main() {" {} +)) && \
+        _current_file="${files[1]:-}" && \
+        _main_file="${files[0]}" && \
+        if [ -n "$_current_file" ]; then _main_file="$_current_file"; fi && \
         _main_dir=$(dirname "$_main_file") && \
         if [ -f "$_main_dir/go.mod" ]; then \
             cd "$_main_dir"; \
