@@ -7,13 +7,38 @@ goarch := "amd64 arm64 loong64"
 # goos := "linux"
 # goarch := "amd64"
 
+rsosarch := "x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu loongarch64-unknown-linux-gnu x86_64-pc-windows-msvc aarch64-pc-windows-msvc x86_64-apple-darwin aarch64-apple-darwin"
+
 default:
     @echo "Shell is: $SHELL"
     @echo "Bash version: $BASH_VERSION"
     @echo
 
-list-files:
-    ls -la
+install-deps:
+    @echo "Installing dependencies..."
+    @SUDO_EXEC=""; \
+    if [ "$UID" -eq 0 ]; then \
+        SUDO_EXEC=""; \
+    else \
+        SUDO_EXEC="sudo"; \
+    fi && \
+    $SUDO_EXEC apt install -y zip unzip bzip2 tar xz-utils clang cmake
+
+install-deps-rust:
+    @echo "Installing Rust dependencies..."
+    @SUDO_EXEC=""; \
+    if [ "$UID" -eq 0 ]; then \
+        SUDO_EXEC=""; \
+    else \
+        SUDO_EXEC="sudo"; \
+    fi && \
+    $SUDO_EXEC apt install -y cpio libssl-dev libxml2-dev llvm-dev lzma-dev patch zlib1g-dev
+
+install-rust-target:
+    @echo "Installing Rust target..."
+    @for osarch in {{rsosarch}}; do \
+        rustup target add $osarch; \
+    done
 
 [group('build')]
 build-go:
@@ -65,8 +90,27 @@ build-go:
         echo "Compression completed"
 
 [group('build')]
-build-rs:
-	@echo "Building Rust project..."
+build-rs: install-rust-target
+    @echo "Building Rust project..."
+    @cd repo && \
+        files=($(find . \
+            -type d \( -path "./tests" \) -prune -false -o \
+            -type f -name "Cargo.toml")) && \
+        if [[ -f "Cargo.toml" ]]; then \
+            for osarch in {{rsosarch}}; do \
+                echo "Building $osarch..."; \
+                cargo build --release --target=$osarch; \
+            done; \
+        else \
+            for file in ${files[@]}; do \
+                for osarch in {{rsosarch}}; do \
+                    echo "Building $osarch... $file"; \
+                    cargo build --release --manifest-path=$file --target=$osarch; \
+                done ;\
+            done; \
+        fi && \
+        echo && \
+        echo "Rust project built successfully"
 
 [group('build')]	
 build-py:
