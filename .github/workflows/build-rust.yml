@@ -88,7 +88,7 @@ jobs:
       run: |
         mkdir -p repo/dist
         for arch in x86_64 aarch64 loongarch64; do
-          tar -cJf "repo/dist/${{ env.TAG_NAME }}-$arch-unknown-linux-musl.tar.xz" -C target/$arch-unknown-linux-musl/release ${{ env.PROJECT_NAME }}
+          tar -cJf "repo/dist/${{ env.TAG_NAME }}-$arch-unknown-linux-musl.tar.xz" -C repo/target/$arch-unknown-linux-musl/release ${{ env.PROJECT_NAME }}
         done            
     - name: Upload Release
       uses: softprops/action-gh-release@v1
@@ -154,7 +154,7 @@ jobs:
       run: |
         mkdir -p repo/dist
         for arch in x86_64 aarch64; do
-          tar -cJf "repo/dist/${{ env.TAG_NAME }}-$arch-apple-darwin.tar.xz" -C target/$arch-apple-darwin/release ${{ env.PROJECT_NAME }}
+          tar -cJf "repo/dist/${{ env.TAG_NAME }}-$arch-apple-darwin.tar.xz" -C repo/target/$arch-apple-darwin/release ${{ env.PROJECT_NAME }}
         done            
     - name: Upload Release
       uses: softprops/action-gh-release@v1
@@ -229,7 +229,7 @@ jobs:
       run: |
         mkdir -p repo/dist
         for arch in x86_64 aarch64; do
-          zip -j "repo/dist/${{ env.TAG_NAME }}-$arch-pc-windows-msvc.zip" "target/$arch-pc-windows-msvc/release/${{ env.PROJECT_NAME }}.exe"
+          zip -j "repo/dist/${{ env.TAG_NAME }}-$arch-pc-windows-msvc.zip" "repo/target/$arch-pc-windows-msvc/release/${{ env.PROJECT_NAME }}.exe"
         done            
     - name: Upload Release
       uses: softprops/action-gh-release@v1
