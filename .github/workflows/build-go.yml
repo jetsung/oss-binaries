@@ -19,6 +19,7 @@ on  :
       EXTRA_ARGS:
         description: 扩展参数（可选，默认无）
         required: false
+        type: string
 
 jobs:
   build-go:
