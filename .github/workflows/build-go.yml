@@ -22,7 +22,7 @@ on  :
         type: string
 
 jobs:
-  build-go:
+  build:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout

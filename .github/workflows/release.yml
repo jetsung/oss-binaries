@@ -5,7 +5,7 @@ on  :
   workflow_dispatch:
     inputs:
       SOURCE:
-        description: 项目源码地址（如 https://github.com/containers/skopeo）
+        description: 项目源码地址（如 https://github.com/org/repo.git）
         required: true
       LANGUAGE:
         description: 项目语言（可选，自动判断）

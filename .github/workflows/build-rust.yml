@@ -176,6 +176,7 @@ jobs:
         echo "BUILD_DIR=${{ github.event.inputs.BUILD_DIR }}" >> $GITHUB_ENV
         echo "EXTRA_ARGS=${{ github.event.inputs.EXTRA_ARGS }}" >> $GITHUB_ENV          
     - name: Checkout source code and get project name
+      shell: bash
       run: |
         git clone "${{ env.SOURCE }}" repo
         cd repo
