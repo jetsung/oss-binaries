@@ -1,0 +1,239 @@
+---
+name: Build Rust Binary
+
+on  :
+  workflow_call:
+    inputs:
+      SOURCE:
+        description: 项目源码地址
+        required: true
+        type: string
+      VERSION:
+        description: 构建版本号（可选，默认最新）
+        required: false
+        type: string
+      BUILD_DIR:
+        description: 构建目录（可选，默认项目根目录）
+        required: false
+        type: string
+      EXTRA_ARGS:
+        description: 扩展参数（可选，默认无）
+        required: false
+        type: string
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set env
+      run: |
+        echo "SOURCE=${{ github.event.inputs.SOURCE }}" >> $GITHUB_ENV
+        echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
+        echo "BUILD_DIR=${{ github.event.inputs.BUILD_DIR }}" >> $GITHUB_ENV
+        echo "EXTRA_ARGS=${{ github.event.inputs.EXTRA_ARGS }}" >> $GITHUB_ENV
+    - name: Checkout source code and get project name
+      run: |
+        git clone "${{ env.SOURCE }}" repo
+        cd repo
+        if [ -n "${{ env.VERSION }}" ]; then
+          git checkout "${{ env.VERSION }}"
+        fi
+        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}')
+        echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
+    - name: Update Rust
+      run: |
+        rustup update
+        rustc --version
+    - name: Install target for Linux
+      run: |
+        for arch in x86_64 aarch64 loongarch64; do
+          rustup target add $arch-unknown-linux-musl
+        done
+      # - name: Local image (rust:latest) for act
+      #   run: |
+      #     if ! command -v sudo &> /dev/null; then
+      #       apt update
+      #       apt install -y sudo jq
+      #     fi
+    - name: Install deps
+      run: |
+        echo "Installing Linux dependencies..."
+        sudo apt update
+        sudo apt install -y build-essential
+    - name: Install Zig
+      uses: jetsung/install-zig@v1
+    - name: Install zigbuild
+      run: cargo install cargo-zigbuild
+    - name: Build Rust Binary
+      working-directory: ./repo
+      run: |
+        for arch in x86_64 aarch64 loongarch64; do
+          cargo zigbuild --release --target $arch-unknown-linux-musl ${{ env.EXTRA_ARGS }}
+        done
+    - name: Check build products
+      run: |
+        ls -1 ./repo/target/*/release/${{ env.PROJECT_NAME }}
+    - name: Create Tag
+      run: |
+        if [ -n "${{ env.VERSION }}" ]; then
+          TAG_NAME="${{ env.PROJECT_NAME }}-${{ env.VERSION }}"
+        else
+          TAG_NAME="${{ env.PROJECT_NAME }}-$(date +%Y%m%d)"
+        fi
+        git tag "$TAG_NAME"
+        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+    - name: Create release tarballs
+      run: |
+        mkdir -p repo/dist
+        for arch in x86_64 aarch64 loongarch64; do
+          tar -cJf "repo/dist/${{ env.TAG_NAME }}-$arch-unknown-linux-musl.tar.xz" -C target/$arch-unknown-linux-musl/release ${{ env.PROJECT_NAME }}
+        done            
+    - name: Upload Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        files: repo/dist/*.tar.xz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-15
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set env
+      run: |
+        echo "SOURCE=${{ github.event.inputs.SOURCE }}" >> $GITHUB_ENV
+        echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
+        echo "BUILD_DIR=${{ github.event.inputs.BUILD_DIR }}" >> $GITHUB_ENV
+        echo "EXTRA_ARGS=${{ github.event.inputs.EXTRA_ARGS }}" >> $GITHUB_ENV
+    - name: Checkout source code and get project name
+      run: |
+        git clone "${{ env.SOURCE }}" repo
+        cd repo
+        if [ -n "${{ env.VERSION }}" ]; then
+          git checkout "${{ env.VERSION }}"
+        fi
+        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}')
+        echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
+    - name: Update Rust
+      run: |
+        rustup update
+        rustc --version
+    - name: Install target for MacOS
+      run: |
+        for arch in x86_64 aarch64; do
+          rustup target add $arch-apple-darwin
+        done
+    - name: Install deps
+      run: |
+        echo "Installing MacOS dependencies..."
+        brew update
+        brew install openssl
+    - name: Build Rust Binary
+      working-directory: ./repo
+      run: |
+        for arch in x86_64 aarch64; do
+          cargo build --release --target $arch-apple-darwin ${{ env.EXTRA_ARGS }}
+        done
+    - name: Check build products
+      run: |
+        ls -1 ./repo/target/*/release/${{ env.PROJECT_NAME }}
+    - name: Create Tag
+      run: |
+        if [ -n "${{ env.VERSION }}" ]; then
+          TAG_NAME="${{ env.PROJECT_NAME }}-${{ env.VERSION }}"
+        else
+          TAG_NAME="${{ env.PROJECT_NAME }}-$(date +%Y%m%d)"
+        fi
+        git tag "$TAG_NAME"
+        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+    - name: Create release tarballs
+      run: |
+        mkdir -p repo/dist
+        for arch in x86_64 aarch64; do
+          tar -cJf "repo/dist/${{ env.TAG_NAME }}-$arch-apple-darwin.tar.xz" -C target/$arch-apple-darwin/release ${{ env.PROJECT_NAME }}
+        done            
+    - name: Upload Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        files: repo/dist/*.tar.xz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    runs-on: windows-2025
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set env
+      run: |
+        echo "SOURCE=${{ github.event.inputs.SOURCE }}" >> $GITHUB_ENV
+        echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
+        echo "BUILD_DIR=${{ github.event.inputs.BUILD_DIR }}" >> $GITHUB_ENV
+        echo "EXTRA_ARGS=${{ github.event.inputs.EXTRA_ARGS }}" >> $GITHUB_ENV          
+    - name: Checkout source code and get project name
+      run: |
+        git clone "${{ env.SOURCE }}" repo
+        cd repo
+        if [ -n "${{ env.VERSION }}" ]; then
+          git checkout "${{ env.VERSION }}"
+        fi
+        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}')
+        echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
+    - name: Update Rust
+      run: |
+        rustup update
+        rustc --version
+    - name: Install zip utility
+      shell: powershell
+      run: choco install zip -y
+    - name: Install target for Windows
+      shell: bash
+      run: |
+        for arch in x86_64 aarch64; do
+          rustup target add $arch-pc-windows-msvc
+        done
+    - name: Install deps
+      run: |
+        echo "Installing Windows dependencies..."
+        brew update
+        brew install openssl
+    - name: Build Rust Binary
+      shell: bash
+      working-directory: ./repo
+      run: |
+        for arch in x86_64 aarch64; do
+          cargo build --release --target $arch-pc-windows-msvc ${{ env.EXTRA_ARGS }}
+        done
+    - name: Check build products
+      shell: bash
+      run: |
+        ls -1 ./repo/target/*/release/${{ env.PROJECT_NAME }}
+    - name: Create Tag
+      shell: bash
+      run: |
+        if [ -n "${{ env.VERSION }}" ]; then
+          TAG_NAME="${{ env.PROJECT_NAME }}-${{ env.VERSION }}"
+        else
+          TAG_NAME="${{ env.PROJECT_NAME }}-$(date +%Y%m%d)"
+        fi
+        git tag "$TAG_NAME"
+        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+    - name: Create release tarballs
+      shell: bash
+      run: |
+        mkdir -p repo/dist
+        for arch in x86_64 aarch64; do
+          zip -j "repo/dist/${{ env.TAG_NAME }}-$arch-pc-windows-msvc.zip" "target/$arch-pc-windows-msvc/release/${{ env.PROJECT_NAME }}.exe"
+        done            
+    - name: Upload Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        files: repo/dist/*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
