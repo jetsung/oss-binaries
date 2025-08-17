@@ -23,6 +23,7 @@ on  :
 
 jobs:
   build-linux:
+    if: false
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
@@ -99,6 +100,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
+    if: false
     runs-on: macos-15
     steps:
     - name: Checkout
@@ -170,6 +172,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Set env
+      shell: bash
       run: |
         echo "SOURCE=${{ github.event.inputs.SOURCE }}" >> $GITHUB_ENV
         echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
@@ -199,10 +202,10 @@ jobs:
           rustup target add $arch-pc-windows-msvc
         done
     - name: Install deps
+      shell: powershell
       run: |
         echo "Installing Windows dependencies..."
-        brew update
-        brew install openssl
+        choco install -y openssl
     - name: Build Rust Binary
       shell: bash
       working-directory: ./repo
