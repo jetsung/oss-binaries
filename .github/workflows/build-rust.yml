@@ -41,7 +41,7 @@ jobs:
         if [ -n "${{ env.VERSION }}" ]; then
           git checkout "${{ env.VERSION }}"
         fi
-        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}')
+        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}' | head -n 1)
         echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
     - name: Update Rust
       run: |
