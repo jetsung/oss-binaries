@@ -12,6 +12,8 @@
 # act
 .actrc
 .artifacts
+.arcenv
+.secrets
 event.json
 
 # build task

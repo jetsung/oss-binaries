@@ -34,13 +34,17 @@ jobs:
         echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
         echo "BUILD_DIR=${{ github.event.inputs.BUILD_DIR }}" >> $GITHUB_ENV
         echo "EXTRA_ARGS=${{ github.event.inputs.EXTRA_ARGS }}" >> $GITHUB_ENV
-    - name: Checkout source code and get project name
+        PROJECT_NAME=$(basename "${{ github.event.inputs.SOURCE }}" .git)
+        echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV      
+    - name: Checkout source code
       run: |
         git clone "${{ env.SOURCE }}" repo
         cd repo
         if [ -n "${{ env.VERSION }}" ]; then
           git checkout "${{ env.VERSION }}"
         fi
+    - name: Get project name
+      run: |
         PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}' | head -n 1)
         echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
     - name: Update Rust
@@ -85,6 +89,14 @@ jobs:
         fi
         git tag "$TAG_NAME"
         echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+    - name: Get short hash
+      working-directory: ./repo
+      run: |
+        GIT_REV=$(git rev-parse --short HEAD)
+        echo "GIT_REV=$GIT_REV" >> $GITHUB_ENV
+        SOURCE_URL=${{ env.SOURCE }}
+        echo "SOURCE_CODE_URL=${SOURCE_URL%.git}/tree/${GIT_REV}" >> $GITHUB_ENV
+        echo "SOURCE_GIT_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV        
     - name: Create release tarballs
       run: |
         mkdir -p repo/dist
@@ -96,6 +108,11 @@ jobs:
       with:
         tag_name: ${{ env.TAG_NAME }}
         files: repo/dist/*.tar.xz
+        body: |
+          Date: ${{ env.SOURCE_GIT_DATE }}
+          Source: [${{ env.SOURCE }}](${{ env.SOURCE_CODE_URL }})
+          Publish by [Jetsung Chan](https://github.com/jetsung)
+        append_body: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -118,7 +135,7 @@ jobs:
         if [ -n "${{ env.VERSION }}" ]; then
           git checkout "${{ env.VERSION }}"
         fi
-        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}')
+        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}' | head -n 1)
         echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
     - name: Update Rust
       run: |
@@ -186,7 +203,7 @@ jobs:
         if [ -n "${{ env.VERSION }}" ]; then
           git checkout "${{ env.VERSION }}"
         fi
-        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}')
+        PROJECT_NAME=$(grep name Cargo.toml | awk -F'"' '{print $2}' | head -n 1)
         echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV          
     - name: Update Rust
       run: |

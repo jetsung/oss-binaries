@@ -1,5 +1,5 @@
 ---
-name: Build Go Binary
+name: Build Chrome CRX Binary
 
 on  :
   workflow_call:
@@ -41,28 +41,31 @@ jobs:
         cd repo
         if [ -n "${{ env.VERSION }}" ]; then
           git checkout "${{ env.VERSION }}"
-        fi    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ^1.24
-        check-latest: true
-    - name: Set up GoReleaser
-      uses: goreleaser/goreleaser-action@v6
-      with:
-        install-only: true
-    - name: Build with GoReleaser
+        fi   
+    - name: Get project name
       run: |
-        cd repo
-        cp ../.goreleaser.yaml .
-        if [ -n "${{ env.VERSION }}" ]; then
-          goreleaser release --clean --skip=validate,publish
-        else
-          goreleaser release --snapshot --clean --skip=validate,publish
+        MANFEST_FILE=$(find ./repo -type f -name 'manifest.json' | head -n 1)
+        if [ -z "$MANFEST_FILE" ]; then
+          echo "manifest.json not found"
+          exit 1
         fi
-    - name: Check files
+        # PROJECT_NAME=$(node -p "require('$MANFEST_FILE').name")
+        # if [ "$PROJECT_NAME" != "__MSG_appName__" ]; then
+        #   echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
+        # fi
+        if [ -z "${{ env.BUILD_DIR }}" ]; then
+          BUILD_DIR=$(dirname "$MANFEST_FILE")
+          echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
+        fi
+    - name: Generate key
       run: |
-        ls -al repo/dist
+        if [ -n "${{ secrets.CRX_PRIVATE_KEY }}" ]; then
+          echo "${ secrets.CRX_PRIVATE_KEY }" > private-key.pem
+          echo "✅ 私钥已存在"
+        else
+          openssl genrsa -out private-key.pem 2048
+          echo "✅ 私钥已生成"
+        fi
     - name: Create Tag
       run: |
         if [ -n "${{ env.VERSION }}" ]; then
@@ -72,10 +75,28 @@ jobs:
         fi
         git tag "$TAG_NAME"
         echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+    - name: Get short hash
+      working-directory: ./repo
+      run: |
+        GIT_REV=$(git rev-parse --short HEAD)
+        echo "GIT_REV=$GIT_REV" >> $GITHUB_ENV
+        SOURCE_URL=${{ env.SOURCE }}
+        echo "SOURCE_CODE_URL=${SOURCE_URL%.git}/tree/${GIT_REV}" >> $GITHUB_ENV
+        echo "SOURCE_GIT_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+    - name: Install CRX Tool
+      run: npm install -g crx3
+    - name: Build CRX
+      run: |
+        crx3 -p private-key.pem -o "${{ env.TAG_NAME }}.crx" "${{ env.BUILD_DIR }}"
     - name: Upload Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.TAG_NAME }}
-        files: repo/dist/*.{tar.gz,zip}
+        files: ${{ env.TAG_NAME }}.crx
+        body: |
+          Date: ${{ env.SOURCE_GIT_DATE }}
+          Source: [${{ env.SOURCE }}](${{ env.SOURCE_CODE_URL }})
+          Publish by [Jetsung Chan](https://github.com/jetsung)
+        append_body: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

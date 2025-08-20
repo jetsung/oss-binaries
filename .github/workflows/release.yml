@@ -34,13 +34,15 @@ jobs:
         else
           git clone "${{ github.event.inputs.SOURCE }}" repo
           cd repo
-          if [ -f go.mod ]; then
+          if [ -f go.mod ] || [ -f "${{ github.event.inputs.BUILD_DIR }}/go.mod" ]; then
             echo "lang=golang" >> $GITHUB_OUTPUT
-          elif [ -f Cargo.toml ]; then
+          elif [ -f Cargo.toml ] || [ -f "${{ github.event.inputs.BUILD_DIR }}/Cargo.toml" ]; then
             echo "lang=rust" >> $GITHUB_OUTPUT
-          elif [ -f package.json ]; then
+          elif [ -f manifest.json ] || [ -f src/manifest.json ] || [ -f "${{ github.event.inputs.BUILD_DIR }}/manifest.json" ]; then
+            echo "lang=crx" >> $GITHUB_OUTPUT            
+          elif [ -f package.json ] || [ -f "${{ github.event.inputs.BUILD_DIR }}/package.json" ]; then
             echo "lang=node" >> $GITHUB_OUTPUT
-          elif [ -f pyproject.toml ]; then
+          elif [ -f pyproject.toml ] || [ -f "${{ github.event.inputs.BUILD_DIR }}/pyproject.toml" ]; then
             echo "lang=python" >> $GITHUB_OUTPUT
           else
             echo "lang=unknown" >> $GITHUB_OUTPUT
@@ -64,6 +66,16 @@ jobs:
     needs: checkout
     if: ${{ needs.checkout.outputs.lang == 'rust' }}
     uses: ./.github/workflows/build-rust.yml
+    with:
+      SOURCE: ${{ github.event.inputs.SOURCE }}
+      VERSION: ${{ github.event.inputs.VERSION }}
+      BUILD_DIR: ${{ github.event.inputs.BUILD_DIR }}
+      EXTRA_ARGS: ${{ github.event.inputs.EXTRA_ARGS }}
+
+  build-crx:
+    needs: checkout
+    if: ${{ needs.checkout.outputs.lang == 'crx' }}
+    uses: ./.github/workflows/build-crx.yml
     with:
       SOURCE: ${{ github.event.inputs.SOURCE }}
       VERSION: ${{ github.event.inputs.VERSION }}
